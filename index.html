@@ -346,7 +346,7 @@
         <div>📜 Terms of Use · 🔒 Privacy Policy: No personal data collected. All scores stored locally on your device.</div>
         <div>© 2025 Sacred Pairs – MIT License · Original code · No tracking · No third-party cookies</div>
         <div class="developer" id="developerSection">
-            📧 Developer contact: <span id="devEmail">(add dedicated email later)</span>
+            📧 Developer contact: <span id="devEmail">safarisoftwares@gmail.com</span>
         </div>
         <div style="font-size:0.65rem; margin-top: 6px;">By playing, you agree that game data is saved only in your browser localStorage.</div>
     </div>
@@ -354,7 +354,6 @@
 
 <script>
     // ========== AUDIO (Web Audio API - no external files) ==========
-    // Generate simple beep sounds programmatically (no external files needed)
     function playSound(type) {
         try {
             const audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -409,8 +408,6 @@
         canvas.style.zIndex = '1000';
         document.body.appendChild(canvas);
         
-        const confettiSettings = { target: canvas, max: 200, size: 1.5, props: ['circle', 'square'], colors: [[255,215,0], [255,100,50], [100,200,100], [50,150,255]] };
-        // Simple manual confetti using basic canvas animation
         let particles = [];
         for(let i=0;i<150;i++) {
             particles.push({
@@ -638,10 +635,6 @@
     loadBestScores();
     initGame();
     initDarkMode();
-    
-    // Placeholder contact (no personal info deployed)
-    document.getElementById('devEmail').textContent = '(add dedicated email later)';
 </script>
 </body>
-</html>   
- 
+</html>
