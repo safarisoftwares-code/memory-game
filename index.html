@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>Sacred Pairs | Memory Game with Levels, Sound & Confetti</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        /* Light mode (default) */
+        :root {
+            --bg-gradient-start: #1a472a;
+            --bg-gradient-end: #0e2a1a;
+            --container-bg: rgba(255,248,225,0.95);
+            --card-bg: linear-gradient(145deg, #ffdd99, #ffb347);
+            --card-shadow: #a05e15;
+            --text-color: #2c2b28;
+            --stat-bg: #2c2b28;
+            --stat-text: #f9eec1;
+            --footer-bg: #1e2a1c;
+            --footer-text: #ddd9c6;
+            --btn-bg: #e67e22;
+            --btn-hover: #d35400;
+        }
+
+        body.dark {
+            --bg-gradient-start: #0f172a;
+            --bg-gradient-end: #020617;
+            --container-bg: #1e293b;
+            --card-bg: linear-gradient(145deg, #334155, #1e293b);
+            --card-shadow: #0f172a;
+            --text-color: #f1f5f9;
+            --stat-bg: #0f172a;
+            --stat-text: #cbd5e1;
+            --footer-bg: #0f172a;
+            --footer-text: #94a3b8;
+            --btn-bg: #8b5cf6;
+            --btn-hover: #7c3aed;
+        }
+
+        body {
+            background: linear-gradient(145deg, var(--bg-gradient-start), var(--bg-gradient-end));
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            transition: background 0.3s;
+        }
+
+        .game-container {
+            max-width: 1000px;
+            width: 100%;
+            background: var(--container-bg);
+            border-radius: 60px 60px 48px 48px;
+            box-shadow: 0 20px 35px rgba(0,0,0,0.4);
+            padding: 20px 20px 30px;
+            transition: background 0.3s;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2rem;
+            margin: 0;
+            background: linear-gradient(135deg, #f5b042, #c06014);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+        }
+
+        .sub {
+            text-align: center;
+            color: var(--text-color);
+            margin-bottom: 15px;
+            opacity: 0.8;
+        }
+
+        /* Level selector */
+        .level-bar {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .level-btn {
+            background: var(--stat-bg);
+            color: var(--stat-text);
+            border: none;
+            padding: 8px 24px;
+            border-radius: 40px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.1s;
+            font-size: 1rem;
+        }
+
+        .level-btn.active {
+            background: var(--btn-bg);
+            color: white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .level-btn:hover {
+            background: var(--btn-hover);
+            color: white;
+        }
+
+        /* Stats panel */
+        .stats-panel {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--stat-bg);
+            padding: 10px 20px;
+            border-radius: 100px;
+            margin-bottom: 25px;
+            color: var(--stat-text);
+            gap: 10px;
+        }
+
+        .stat {
+            background: rgba(0,0,0,0.3);
+            padding: 5px 16px;
+            border-radius: 40px;
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+
+        .timer-toggle, .dark-toggle {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(0,0,0,0.3);
+            padding: 5px 15px;
+            border-radius: 40px;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 48px;
+            height: 24px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #7f8c8d;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: var(--btn-bg);
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(24px);
+        }
+
+        /* Cards grid */
+        .cards-grid {
+            display: grid;
+            gap: 12px;
+            justify-items: center;
+            align-items: center;
+            margin-bottom: 25px;
+        }
+
+        .grid-easy { grid-template-columns: repeat(4, 1fr); }
+        .grid-medium { grid-template-columns: repeat(4, 1fr); }
+        .grid-hard { grid-template-columns: repeat(6, 1fr); }
+
+        .card {
+            background: var(--card-bg);
+            width: 100%;
+            aspect-ratio: 1 / 1;
+            max-width: 110px;
+            border-radius: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            box-shadow: 0 8px 0 var(--card-shadow);
+            transition: 0.08s linear;
+        }
+
+        .card:active {
+            transform: translateY(3px);
+            box-shadow: 0 4px 0 var(--card-shadow);
+        }
+
+        .card.flipped, .card.matched {
+            background: var(--container-bg);
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            transform: scale(0.98);
+        }
+
+        .card.matched {
+            background: #4ade80;
+            color: #1a472a;
+        }
+
+        body.dark .card.matched {
+            background: #22c55e;
+        }
+
+        .disable-click {
+            pointer-events: none;
+            opacity: 0.95;
+        }
+
+        .win-message {
+            text-align: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+            background: gold;
+            padding: 10px;
+            border-radius: 50px;
+            margin: 10px 0;
+            display: none;
+            color: #2c2b28;
+        }
+
+        .reset-btn {
+            background: var(--btn-bg);
+            border: none;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 10px 28px;
+            border-radius: 50px;
+            cursor: pointer;
+            display: block;
+            margin: 0 auto 20px auto;
+            transition: 0.1s;
+        }
+
+        .reset-btn:hover {
+            background: var(--btn-hover);
+            transform: scale(1.02);
+        }
+
+        .legal-footer {
+            margin-top: 25px;
+            background: var(--footer-bg);
+            border-radius: 30px;
+            padding: 12px 16px;
+            color: var(--footer-text);
+            font-size: 0.7rem;
+            text-align: center;
+        }
+
+        .developer {
+            margin: 8px 0;
+            font-size: 0.75rem;
+        }
+
+        .share-score {
+            background: #3c6e47;
+            border: none;
+            color: white;
+            border-radius: 40px;
+            padding: 5px 14px;
+            cursor: pointer;
+        }
+
+        body.dark .share-score {
+            background: #6366f1;
+        }
+
+        @media (max-width: 650px) {
+            .card { font-size: 1.8rem; }
+            .grid-hard { grid-template-columns: repeat(4, 1fr); }
+            .stats-panel { flex-direction: column; align-items: stretch; border-radius: 30px; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="game-container">
+    <h1>🃏 SACRED PAIRS 🃏</h1>
+    <div class="sub">match the cards · sound + confetti + dark mode</div>
+
+    <div class="level-bar">
+        <button class="level-btn" data-level="easy">🍃 EASY (6 pairs)</button>
+        <button class="level-btn active" data-level="medium">🔥 MEDIUM (8 pairs)</button>
+        <button class="level-btn" data-level="hard">⛰️ HARD (12 pairs)</button>
+    </div>
+
+    <div class="stats-panel">
+        <div class="stat">🎯 MOVES: <span id="moveCounter">0</span></div>
+        <div class="stat">🏆 BEST: <span id="bestScore">—</span></div>
+        <div class="timer-toggle">
+            ⏱️ Timer
+            <label class="switch">
+                <input type="checkbox" id="timerToggle" checked>
+                <span class="slider"></span>
+            </label>
+            <span id="timerDisplay">00:00</span>
+        </div>
+        <div class="dark-toggle">
+            🌙 Dark
+            <label class="switch">
+                <input type="checkbox" id="darkToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <button class="share-score" id="shareScoreBtn">📢 Share</button>
+    </div>
+
+    <div class="cards-grid" id="cardsGrid"></div>
+    <div class="win-message" id="winMessage"></div>
+    <button class="reset-btn" id="resetGameBtn">🔄 New Game</button>
+
+    <div class="legal-footer">
+        <div>📜 Terms of Use · 🔒 Privacy Policy: No personal data collected. All scores stored locally on your device.</div>
+        <div>© 2025 Sacred Pairs – MIT License · Original code · No tracking · No third-party cookies</div>
+        <div class="developer" id="developerSection">
+            📧 Developer contact: <span id="devEmail">(add dedicated email later)</span>
+        </div>
+        <div style="font-size:0.65rem; margin-top: 6px;">By playing, you agree that game data is saved only in your browser localStorage.</div>
+    </div>
+</div>
+
+<script>
+    // ========== AUDIO (Web Audio API - no external files) ==========
+    // Generate simple beep sounds programmatically (no external files needed)
+    function playSound(type) {
+        try {
+            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            const oscillator = audioContext.createOscillator();
+            const gainNode = audioContext.createGain();
+            oscillator.connect(gainNode);
+            gainNode.connect(audioContext.destination);
+            
+            if (type === 'match') {
+                oscillator.frequency.value = 880;
+                gainNode.gain.value = 0.2;
+                oscillator.type = 'sine';
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.3);
+                oscillator.stop(audioContext.currentTime + 0.3);
+            } else if (type === 'mismatch') {
+                oscillator.frequency.value = 440;
+                gainNode.gain.value = 0.15;
+                oscillator.type = 'sawtooth';
+                oscillator.start();
+                gainNode.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + 0.2);
+                oscillator.stop(audioContext.currentTime + 0.2);
+            } else if (type === 'win') {
+                // little victory arpeggio
+                const playNote = (freq, duration) => {
+                    const osc = audioContext.createOscillator();
+                    const gain = audioContext.createGain();
+                    osc.connect(gain);
+                    gain.connect(audioContext.destination);
+                    osc.frequency.value = freq;
+                    gain.gain.value = 0.15;
+                    osc.start();
+                    gain.gain.exponentialRampToValueAtTime(0.00001, audioContext.currentTime + duration);
+                    osc.stop(audioContext.currentTime + duration);
+                };
+                playNote(523.25, 0.15);
+                setTimeout(() => playNote(659.25, 0.15), 150);
+                setTimeout(() => playNote(783.99, 0.3), 300);
+            }
+        } catch(e) { console.log("Audio not supported"); }
+    }
+
+    // ========== CONFETTI ==========
+    function launchConfetti() {
+        const canvas = document.createElement('canvas');
+        canvas.style.position = 'fixed';
+        canvas.style.top = '0';
+        canvas.style.left = '0';
+        canvas.style.width = '100%';
+        canvas.style.height = '100%';
+        canvas.style.pointerEvents = 'none';
+        canvas.style.zIndex = '1000';
+        document.body.appendChild(canvas);
+        
+        const confettiSettings = { target: canvas, max: 200, size: 1.5, props: ['circle', 'square'], colors: [[255,215,0], [255,100,50], [100,200,100], [50,150,255]] };
+        // Simple manual confetti using basic canvas animation
+        let particles = [];
+        for(let i=0;i<150;i++) {
+            particles.push({
+                x: Math.random() * window.innerWidth,
+                y: Math.random() * window.innerHeight - window.innerHeight,
+                size: Math.random() * 8 + 4,
+                color: `hsl(${Math.random() * 360}, 70%, 60%)`,
+                speedY: Math.random() * 5 + 3,
+                speedX: (Math.random() - 0.5) * 3
+            });
+        }
+        function animateConfetti() {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            let anyVisible = false;
+            for(let p of particles) {
+                p.y += p.speedY;
+                p.x += p.speedX;
+                if(p.y < window.innerHeight) anyVisible = true;
+                ctx.fillStyle = p.color;
+                ctx.fillRect(p.x, p.y, p.size, p.size);
+            }
+            if(anyVisible) requestAnimationFrame(animateConfetti);
+            else canvas.remove();
+        }
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        animateConfetti();
+        setTimeout(() => canvas.remove(), 3000);
+    }
+
+    // ========== LEVEL CONFIGURATION ==========
+    const LEVELS = {
+        easy: { pairs: 6, cols: 4, gridClass: 'grid-easy', name: 'Easy' },
+        medium: { pairs: 8, cols: 4, gridClass: 'grid-medium', name: 'Medium' },
+        hard: { pairs: 12, cols: 6, gridClass: 'grid-hard', name: 'Hard' }
+    };
+
+    const BASE_ICONS = ["🕊️", "✝️", "☦️", "🕯️", "🌿", "🍇", "🌟", "🌈", "🐑", "⛪", "🍞", "🍷"];
+
+    let currentLevel = 'medium';
+    let cardsData = [], cardStates = [];
+    let moveCount = 0, lockBoard = false, firstIndex = null, secondIndex = null;
+    let timerSeconds = 0, timerInterval = null, timerEnabled = true, gameFinished = false;
+    let bestScores = { easy: Infinity, medium: Infinity, hard: Infinity };
+
+    function loadBestScores() {
+        for(let level of ['easy','medium','hard']) {
+            let saved = localStorage.getItem(`sacredPairs_best_${level}`);
+            bestScores[level] = saved ? parseInt(saved) : Infinity;
+        }
+        updateBestDisplay();
+    }
+    function updateBestDisplay() {
+        let best = bestScores[currentLevel];
+        document.getElementById('bestScore').textContent = (best === Infinity) ? '✨ none' : best;
+    }
+    function saveBestForCurrentLevel() {
+        if(moveCount < bestScores[currentLevel]) {
+            bestScores[currentLevel] = moveCount;
+            localStorage.setItem(`sacredPairs_best_${currentLevel}`, moveCount);
+            updateBestDisplay();
+            return true;
+        }
+        return false;
+    }
+    function shuffleArray(arr) {
+        for(let i=arr.length-1; i>0; i--) {
+            const j = Math.floor(Math.random()*(i+1));
+            [arr[i], arr[j]] = [arr[j], arr[i]];
+        }
+        return arr;
+    }
+    function initGame() {
+        if(timerInterval) clearInterval(timerInterval);
+        gameFinished = false;
+        lockBoard = false;
+        firstIndex = secondIndex = null;
+        moveCount = 0;
+        document.getElementById('moveCounter').textContent = "0";
+        document.getElementById('winMessage').style.display = 'none';
+        
+        const config = LEVELS[currentLevel];
+        let usedIcons = BASE_ICONS.slice(0, config.pairs);
+        let deck = shuffleArray([...usedIcons, ...usedIcons]);
+        cardsData = deck;
+        cardStates = new Array(deck.length).fill('hidden');
+        
+        const grid = document.getElementById('cardsGrid');
+        grid.className = `cards-grid ${config.gridClass}`;
+        grid.style.gap = (currentLevel === 'hard') ? '10px' : '14px';
+        
+        timerEnabled = document.getElementById('timerToggle').checked;
+        if(timerEnabled) {
+            timerSeconds = 0;
+            updateTimerDisplay(0);
+            startTimer();
+        } else {
+            if(timerInterval) clearInterval(timerInterval);
+            document.getElementById('timerDisplay').textContent = "OFF";
+        }
+        renderBoard();
+        document.getElementById('cardsGrid').classList.remove('disable-click');
+        updateBestDisplay();
+    }
+    function startTimer() {
+        if(timerInterval) clearInterval(timerInterval);
+        if(!timerEnabled) return;
+        timerInterval = setInterval(() => {
+            if(!gameFinished && timerEnabled) {
+                timerSeconds++;
+                updateTimerDisplay(timerSeconds);
+            }
+        }, 1000);
+    }
+    function updateTimerDisplay(sec) {
+        let mins = Math.floor(sec/60), secs = sec%60;
+        document.getElementById('timerDisplay').textContent = `${mins.toString().padStart(2,'0')}:${secs.toString().padStart(2,'0')}`;
+    }
+    function renderBoard() {
+        const grid = document.getElementById('cardsGrid');
+        grid.innerHTML = '';
+        for(let i=0; i<cardsData.length; i++) {
+            const card = document.createElement('div');
+            card.classList.add('card');
+            if(cardStates[i] === 'hidden') card.textContent = '?';
+            else { card.textContent = cardsData[i]; card.classList.add(cardStates[i] === 'matched' ? 'matched' : 'flipped'); }
+            card.dataset.index = i;
+            card.addEventListener('click', () => onCardClick(i));
+            grid.appendChild(card);
+        }
+    }
+    function onCardClick(idx) {
+        if(gameFinished || lockBoard) return;
+        if(cardStates[idx] === 'matched' || cardStates[idx] === 'flipped') return;
+        if(firstIndex === null && secondIndex === null) {
+            cardStates[idx] = 'flipped';
+            renderBoard();
+            firstIndex = idx;
+            return;
+        }
+        if(firstIndex !== null && secondIndex === null && idx !== firstIndex) {
+            cardStates[idx] = 'flipped';
+            renderBoard();
+            secondIndex = idx;
+            moveCount++;
+            document.getElementById('moveCounter').textContent = moveCount;
+            lockBoard = true;
+            setTimeout(() => checkMatch(), 500);
+        }
+    }
+    function checkMatch() {
+        const isMatch = (cardsData[firstIndex] === cardsData[secondIndex]);
+        if(isMatch) {
+            playSound('match');
+            cardStates[firstIndex] = cardStates[secondIndex] = 'matched';
+            renderBoard();
+            firstIndex = secondIndex = null;
+            lockBoard = false;
+            if(cardStates.every(s => s === 'matched')) endGameWin();
+        } else {
+            playSound('mismatch');
+            cardStates[firstIndex] = cardStates[secondIndex] = 'hidden';
+            renderBoard();
+            firstIndex = secondIndex = null;
+            lockBoard = false;
+        }
+    }
+    function endGameWin() {
+        gameFinished = true;
+        if(timerInterval) clearInterval(timerInterval);
+        const isNew = saveBestForCurrentLevel();
+        playSound('win');
+        launchConfetti();
+        const winDiv = document.getElementById('winMessage');
+        let timeStr = timerEnabled ? `${Math.floor(timerSeconds/60)}:${(timerSeconds%60).toString().padStart(2,'0')}` : '';
+        winDiv.innerHTML = `🎉 VICTORY! 🎉<br>${moveCount} moves ${timeStr} ${isNew ? '🏆 NEW RECORD!' : ''}`;
+        winDiv.style.display = 'block';
+        document.getElementById('cardsGrid').classList.add('disable-click');
+    }
+    function resetGame() { initGame(); }
+    function changeLevel(level) {
+        if(level === currentLevel) return;
+        currentLevel = level;
+        document.querySelectorAll('.level-btn').forEach(btn => {
+            if(btn.dataset.level === level) btn.classList.add('active');
+            else btn.classList.remove('active');
+        });
+        resetGame();
+    }
+    function shareScore() {
+        let msg = `🎮 Sacred Pairs - ${LEVELS[currentLevel].name}\n🎯 Moves: ${moveCount}`;
+        if(timerEnabled && !gameFinished) msg += ` ⏱️ Time: ${Math.floor(timerSeconds/60)}:${(timerSeconds%60).toString().padStart(2,'0')}`;
+        if(bestScores[currentLevel] !== Infinity) msg += `\n🏆 Best: ${bestScores[currentLevel]} moves`;
+        if(navigator.share) navigator.share({ title: 'Sacred Pairs Score', text: msg }).catch(()=>copyScore(msg));
+        else copyScore(msg);
+    }
+    function copyScore(t) { navigator.clipboard.writeText(t).then(()=>alert('✅ Score copied!')).catch(()=>alert('Share: '+t)); }
+    
+    // Dark mode
+    function initDarkMode() {
+        const darkToggle = document.getElementById('darkToggle');
+        const savedDark = localStorage.getItem('sacredPairs_dark');
+        if(savedDark === 'true') {
+            document.body.classList.add('dark');
+            darkToggle.checked = true;
+        }
+        darkToggle.addEventListener('change', () => {
+            if(darkToggle.checked) {
+                document.body.classList.add('dark');
+                localStorage.setItem('sacredPairs_dark', 'true');
+            } else {
+                document.body.classList.remove('dark');
+                localStorage.setItem('sacredPairs_dark', 'false');
+            }
+        });
+    }
+    
+    // Event listeners
+    document.getElementById('resetGameBtn').addEventListener('click', resetGame);
+    document.getElementById('shareScoreBtn').addEventListener('click', shareScore);
+    document.getElementById('timerToggle').addEventListener('change', () => { timerEnabled = document.getElementById('timerToggle').checked; resetGame(); });
+    document.querySelectorAll('.level-btn').forEach(btn => btn.addEventListener('click', () => changeLevel(btn.dataset.level)));
+    
+    loadBestScores();
+    initGame();
+    initDarkMode();
+    
+    // Placeholder contact (no personal info deployed)
+    document.getElementById('devEmail').textContent = '(add dedicated email later)';
+</script>
+</body>
+</html>   
+ 
