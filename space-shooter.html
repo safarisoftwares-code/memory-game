@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⭐ COSMIC DEFENDER | Space Shooter</title>
+    <style>
+        * { user-select: none; }
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: radial-gradient(circle at 20% 30%, #0a0f1e, #020408);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: monospace;
+            padding: 20px;
+        }
+        .game-container {
+            background: rgba(0,0,0,0.5);
+            border-radius: 48px;
+            padding: 12px;
+        }
+        canvas {
+            display: block;
+            margin: 0 auto;
+            border-radius: 32px;
+            cursor: none;
+        }
+        .info-panel {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 16px;
+            color: white;
+            background: rgba(0,0,0,0.65);
+            padding: 10px 24px;
+            border-radius: 60px;
+        }
+        .stats {
+            display: flex;
+            gap: 24px;
+            font-size: 1rem;
+        }
+        .stats span { color: #ffd966; }
+        button {
+            background: #1f2a3e;
+            border: none;
+            color: white;
+            padding: 6px 18px;
+            border-radius: 80px;
+            cursor: pointer;
+        }
+        .difficulty-group { display: flex; gap: 8px; }
+        .difficulty-btn {
+            background: #2a3a4a;
+            padding: 4px 14px;
+        }
+        .difficulty-btn.active { background: #e67e22; }
+        .guide-toggle {
+            background: #2a1e3c;
+            padding: 6px 18px;
+            border-radius: 40px;
+            cursor: pointer;
+        }
+        .guide-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            visibility: hidden;
+        }
+        .guide-modal.show { visibility: visible; }
+        .guide-content {
+            background: #1a2a3a;
+            padding: 30px;
+            border-radius: 48px;
+            text-align: center;
+            color: white;
+        }
+        .close-guide { background: #e67e22; margin-top: 20px; }
+    </style>
+</head>
+<body>
+<div>
+    <div class="info-panel">
+        <div class="stats">💥 SCORE: <span id="scoreValue">0</span> | 🌊 WAVE: <span id="waveValue">0</span> | ❤️ <span id="healthValue">10</span></div>
+        <div class="stats">🏆 HIGH: <span id="highScoreValue">0</span></div>
+        <div class="difficulty-group">
+            <button class="difficulty-btn" data-diff="easy">EASY</button>
+            <button class="difficulty-btn active" data-diff="normal">NORMAL</button>
+            <button class="difficulty-btn" data-diff="hard">HARD</button>
+        </div>
+        <div class="guide-toggle" id="guideToggleBtn">📖 GUIDE</div>
+        <button id="resetBtn">RESTART</button>
+    </div>
+    <div class="game-container">
+        <canvas id="gameCanvas" width="900" height="600"></canvas>
+    </div>
+    <div style="text-align:center; margin-top:16px; color:#88aaff;">📧 safarisoftwares@gmail.com</div>
+</div>
+
+<div id="guideModal" class="guide-modal">
+    <div class="guide-content">
+        <h2>HOW TO PLAY</h2>
+        <p>🖱️ MOVE: Mouse</p>
+        <p>🔫 SHOOT: Click / Spacebar</p>
+        <p>💥 HOMING MISSILE: Right-click / Shift</p>
+        <p>✨ COLLECT POWER-UPS</p>
+        <button class="close-guide" id="closeGuideBtn">GOT IT</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const W = 900, H = 600;
+
+    let difficulty = 'normal';
+    let gameRunning = true;
+    let score = 0, wave = 1, health = 10;
+    let highScore = localStorage.getItem('shooterHigh') || 0;
+    let enemies = [], bullets = [], powerups = [], particles = [];
+    let shootCooldown = 0, rapidFireUntil = 0, shieldUntil = 0, homingCharges = 3;
+    let player = { x: W/2, y: H-60, radius: 12 };
+    let mouseX = W/2;
+
+    document.getElementById('highScoreValue').innerText = highScore;
+
+    function updateUI() {
+        document.getElementById('scoreValue').innerText = score;
+        document.getElementById('waveValue').innerText = wave;
+        document.getElementById('healthValue').innerText = health;
+        if(score > highScore) {
+            highScore = score;
+            localStorage.setItem('shooterHigh', highScore);
+            document.getElementById('highScoreValue').innerText = highScore;
+        }
+    }
+
+    function getSpeed() {
+        if(difficulty === 'easy') return 0.6;
+        if(difficulty === 'hard') return 1.5;
+        return 1;
+    }
+
+    class Enemy {
+        constructor(x, y, type) {
+            this.x = x; this.y = y;
+            this.type = type;
+            this.radius = type === 'boss' ? 30 : 12;
+            this.health = type === 'boss' ? 30 : 2;
+            this.speedY = (type === 'boss' ? 1 : 2) * getSpeed();
+            this.points = type === 'boss' ? 200 : 20;
+        }
+        update() {
+            this.y += this.speedY;
+            if(this.type === 'boss') this.x += Math.sin(Date.now() * 0.003) * 1;
+        }
+        draw() {
+            ctx.fillStyle = this.type === 'boss' ? '#e76f51' : '#f05454';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI*2);
+            ctx.fill();
+            if(this.type === 'boss') {
+                ctx.fillStyle = 'white';
+                ctx.font = "20px monospace";
+                ctx.fillText("👾", this.x-15, this.y+8);
+            }
+        }
+    }
+
+    class PowerUp {
+        constructor(x, y, type) {
+            this.x = x; this.y = y;
+            this.type = type;
+        }
+        draw() {
+            ctx.fillStyle = '#f9e45b';
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, 10, 0, Math.PI*2);
+            ctx.fill();
+            ctx.fillStyle = 'black';
+            ctx.font = "14px monospace";
+            ctx.fillText(this.type === 'rapid' ? '⚡' : '❤️', this.x-5, this.y+5);
+        }
+    }
+
+    function addExplosion(x, y) {
+        for(let i=0;i<10;i++) particles.push({ x, y, vx: (Math.random()-0.5)*3, vy: (Math.random()-0.5)*3, life: 15 });
+    }
+
+    function startWave() {
+        let count = 3 + wave;
+        for(let i=0;i<count;i++) {
+            setTimeout(() => {
+                if(!gameRunning) return;
+                let type = (wave % 5 === 0 && i === 0) ? 'boss' : 'normal';
+                enemies.push(new Enemy(50 + Math.random() * (W-100), -30, type));
+            }, i * 400);
+        }
+    }
+
+    function shoot() {
+        if(!gameRunning) return;
+        bullets.push({ x: player.x, y: player.y-10, radius: 5, enemy: false });
+    }
+
+    function resetGame() {
+        gameRunning = true;
+        health = 10;
+        score = 0;
+        wave = 1;
+        enemies = [];
+        bullets = [];
+        powerups = [];
+        particles = [];
+        rapidFireUntil = 0;
+        shieldUntil = 0;
+        homingCharges = 3;
+        updateUI();
+        startWave();
+    }
+
+    function updateGame() {
+        if(!gameRunning) return;
+        player.x = Math.min(W-20, Math.max(20, mouseX));
+        if(shootCooldown > 0) shootCooldown--;
+        else if(shootCooldown === 0 && gameRunning) {
+            shoot();
+            shootCooldown = Date.now() < rapidFireUntil ? 4 : 10;
+        }
+
+        for(let i=0;i<enemies.length;i++) {
+            let e = enemies[i];
+            e.update();
+            if(Math.hypot(player.x - e.x, player.y - e.y) < player.radius + e.radius && !(Date.now() < shieldUntil)) {
+                health--;
+                addExplosion(e.x, e.y);
+                enemies.splice(i,1);
+                updateUI();
+                if(health <= 0) { gameRunning = false; }
+                continue;
+            }
+            for(let j=0;j<bullets.length;j++) {
+                if(Math.hypot(bullets[j].x - e.x, bullets[j].y - e.y) < e.radius) {
+                    e.health--;
+                    bullets.splice(j,1);
+                    if(e.health <= 0) {
+                        score += e.points;
+                        addExplosion(e.x, e.y);
+                        enemies.splice(i,1);
+                        updateUI();
+                        if(Math.random() < 0.2) powerups.push(new PowerUp(e.x, e.y, 'rapid'));
+                    }
+                    break;
+                }
+            }
+        }
+
+        for(let i=0;i<bullets.length;i++) {
+            bullets[i].y -= 6;
+            if(bullets[i].y < 0) bullets.splice(i,1);
+        }
+
+        for(let i=0;i<powerups.length;i++) {
+            powerups[i].y += 2;
+            if(Math.hypot(player.x - powerups[i].x, player.y - powerups[i].y) < 20) {
+                if(powerups[i].type === 'rapid') rapidFireUntil = Date.now() + 5000;
+                if(powerups[i].type === 'health') health = Math.min(10, health+2);
+                powerups.splice(i,1);
+                updateUI();
+            }
+        }
+
+        for(let i=0;i<particles.length;i++) {
+            particles[i].x += particles[i].vx;
+            particles[i].y += particles[i].vy;
+            particles[i].life--;
+            if(particles[i].life <= 0) particles.splice(i,1);
+        }
+
+        if(enemies.length === 0 && gameRunning) {
+            wave++;
+            updateUI();
+            startWave();
+        }
+    }
+
+    function draw() {
+        ctx.fillStyle = '#020408';
+        ctx.fillRect(0,0,W,H);
+        for(let i=0;i<100;i++) {
+            ctx.fillStyle = `rgba(255,255,200,${Math.random()*0.5})`;
+            ctx.fillRect(Math.random()*W, Math.random()*H, 2,2);
+        }
+        for(let e of enemies) e.draw();
+        for(let b of bullets) {
+            ctx.fillStyle = '#88ffcc';
+            ctx.beginPath();
+            ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
+            ctx.fill();
+        }
+        for(let p of powerups) p.draw();
+        ctx.fillStyle = '#6ee7ff';
+        ctx.beginPath();
+        ctx.moveTo(player.x, player.y-15);
+        ctx.lineTo(player.x+12, player.y+5);
+        ctx.lineTo(player.x, player.y);
+        ctx.lineTo(player.x-12, player.y+5);
+        ctx.fill();
+        for(let p of particles) {
+            ctx.fillStyle = '#ffaa44';
+            ctx.fillRect(p.x, p.y, 3,3);
+        }
+        if(!gameRunning) {
+            ctx.font = "30px monospace";
+            ctx.fillStyle = '#ff3366';
+            ctx.fillText("GAME OVER", W/2-80, H/2);
+        }
+    }
+
+    function loop() {
+        updateGame();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        mouseX = (e.clientX - rect.left) * (canvas.width/rect.width);
+    });
+    canvas.addEventListener('click', () => { if(gameRunning && shootCooldown <= 0) { shoot(); shootCooldown = 10; } });
+    document.getElementById('resetBtn').addEventListener('click', resetGame);
+    document.querySelectorAll('.difficulty-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.difficulty-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            difficulty = btn.dataset.diff;
+            resetGame();
+        });
+    });
+    document.getElementById('guideToggleBtn').addEventListener('click', () => document.getElementById('guideModal').classList.add('show'));
+    document.getElementById('closeGuideBtn').addEventListener('click', () => document.getElementById('guideModal').classList.remove('show'));
+
+    startWave();
+    loop();
+    updateUI();
+</script>
+</body>
+</html>
