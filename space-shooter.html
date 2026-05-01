@@ -176,7 +176,7 @@
         <p>🔫 <strong>Shoot:</strong> Click / Spacebar</p>
         <p>💥 <strong>Homing Missile:</strong> Right-click / Shift key</p>
         <p>✨ <strong>Power-ups:</strong> Collect glowing orbs</p>
-        <p>👾 <strong>Boss:</strong> Every 5 waves</p>
+        <p>👾 <strong>Enemies spawn automatically!</strong> Keep shooting!</p>
         <button class="close-guide" id="closeGuideBtn">GOT IT!</button>
     </div>
 </div>
@@ -189,11 +189,17 @@
     let difficulty = 'normal';
     let gameRunning = true;
     let score = 0, wave = 1, health = 10;
+    let enemiesKilled = 0;  // Track kills for wave progression
     let highScore = localStorage.getItem('cosmicHigh') ? parseInt(localStorage.getItem('cosmicHigh')) : 0;
     let enemies = [], bullets = [], powerups = [], particles = [], homingMissiles = [];
     let shootCooldown = 0, rapidFireUntil = 0, doubleScoreUntil = 0, shieldUntil = 0, homingCharges = 3;
     let player = { x: W/2, y: H - 60, radius: 14 };
     let mouseX = W/2, bossActive = false;
+    
+    // Continuous spawn timer
+    let spawnInterval = null;
+    let lastSpawnTime = 0;
+    let bossSpawnTriggered = false;
 
     document.getElementById('highScoreValue').innerText = highScore;
 
@@ -209,9 +215,9 @@
     }
 
     function getDifficultyMod() {
-        if(difficulty === 'easy') return { enemySpeed: 0.6, spawnDelay: 900, playerHealthBonus: 2 };
-        if(difficulty === 'hard') return { enemySpeed: 1.5, spawnDelay: 450, playerHealthBonus: -2 };
-        return { enemySpeed: 1.0, spawnDelay: 650, playerHealthBonus: 0 };
+        if(difficulty === 'easy') return { enemySpeed: 0.6, spawnDelay: 1200, playerHealthBonus: 2, enemyCount: 1 };
+        if(difficulty === 'hard') return { enemySpeed: 1.5, spawnDelay: 500, playerHealthBonus: -2, enemyCount: 2 };
+        return { enemySpeed: 1.0, spawnDelay: 800, playerHealthBonus: 0, enemyCount: 1 };
     }
 
     class Enemy {
@@ -222,16 +228,20 @@
             this.health = type === 'boss' ? 35 : (type === 'elite' ? 6 : 2);
             this.maxHealth = this.health;
             const speedMod = getDifficultyMod().enemySpeed;
-            this.speedY = (type === 'boss' ? 1.0 : (type === 'elite' ? 1.8 : 2.2)) * speedMod;
+            this.speedY = (type === 'boss' ? 0.8 : (type === 'elite' ? 1.5 : 2.0)) * speedMod;
             this.points = type === 'boss' ? 200 : (type === 'elite' ? 50 : 20);
             this.color = type === 'boss' ? '#e76f51' : (type === 'elite' ? '#bc6ff9' : '#f05454');
         }
         update() {
             this.y += this.speedY;
-            if(this.type === 'boss') this.x += Math.sin(Date.now() * 0.003) * 1.2;
-        }
-        shoot() {
-            if(gameRunning && Math.random() < 0.02 && this.y < H-100) {
+            if(this.type === 'boss') {
+                this.x += Math.sin(Date.now() * 0.003) * 1.2;
+                // Boss shoots
+                if(Math.random() < 0.02 && this.y < H-100 && gameRunning) {
+                    bullets.push({ x: this.x, y: this.y+5, radius: 5, enemy: true, damage: 1 });
+                }
+            }
+            if(this.type === 'elite' && Math.random() < 0.01 && this.y < H-100 && gameRunning) {
                 bullets.push({ x: this.x, y: this.y+5, radius: 5, enemy: true, damage: 1 });
             }
         }
@@ -295,24 +305,35 @@
         }
     }
 
-    function startWave() {
-        bossActive = false;
-        let enemiesToSpawn = Math.min(3 + Math.floor(wave * 0.6), 12);
-        for(let i=0;i<enemiesToSpawn;i++) {
-            setTimeout(() => {
-                if(!gameRunning) return;
+    // CONTINUOUS SPAWNING - enemies come automatically!
+    function startContinuousSpawning() {
+        if(spawnInterval) clearInterval(spawnInterval);
+        
+        const mod = getDifficultyMod();
+        spawnInterval = setInterval(() => {
+            if(!gameRunning) return;
+            
+            // Spawn enemies continuously based on wave difficulty
+            let spawnCount = mod.enemyCount;
+            if(wave >= 10) spawnCount = 2;
+            if(wave >= 20) spawnCount = 3;
+            
+            for(let s = 0; s < spawnCount; s++) {
                 let type = 'normal';
-                if(wave >= 3 && Math.random() < 0.2) type = 'elite';
-                enemies.push(new Enemy(40 + Math.random() * (W-80), -30, type));
-            }, i * getDifficultyMod().spawnDelay);
-        }
-        if(wave % 5 === 0 && wave > 0) {
-            setTimeout(() => {
-                if(!gameRunning) return;
+                let rand = Math.random();
+                if(wave >= 3 && rand < 0.15) type = 'elite';
+                if(wave >= 5 && rand < 0.05) type = 'boss';
+                
+                let xPos = 30 + Math.random() * (W - 60);
+                enemies.push(new Enemy(xPos, -30, type));
+            }
+            
+            // Boss spawn every 50 kills
+            if(!bossActive && enemiesKilled > 0 && enemiesKilled % 50 === 0 && enemies.filter(e => e.type === 'boss').length === 0) {
                 enemies.push(new Enemy(W/2-40, -50, 'boss'));
                 bossActive = true;
-            }, 1000);
-        }
+            }
+        }, mod.spawnDelay);
     }
 
     function shootFromPlayer() {
@@ -342,11 +363,15 @@
         gameRunning = true;
         const bonus = getDifficultyMod().playerHealthBonus;
         health = 10 + (bonus > 0 ? bonus : (difficulty === 'hard' ? 7 : 0));
-        score = 0; wave = 1;
+        score = 0; wave = 1; enemiesKilled = 0;
         enemies = []; bullets = []; powerups = []; homingMissiles = []; particles = [];
         rapidFireUntil = 0; doubleScoreUntil = 0; shieldUntil = 0; homingCharges = 3;
+        bossActive = false;
         updateUI();
-        startWave();
+        
+        // Restart continuous spawning
+        if(spawnInterval) clearInterval(spawnInterval);
+        startContinuousSpawning();
     }
 
     function updateGame() {
@@ -354,25 +379,25 @@
         player.x = Math.min(W - 20, Math.max(20, mouseX));
         if(shootCooldown > 0) shootCooldown--;
 
-        // Enemy shooting
-        for(let e of enemies) {
-            if(e.type === 'boss') e.shoot();
-            if((e.type === 'elite') && Math.random() < 0.01) e.shoot();
-        }
-
-        // Enemy collision
+        // Update and check enemies
         for(let i=0;i<enemies.length;i++) {
             let e = enemies[i];
             e.update();
+            
+            // Collision with player
             let dist = Math.hypot(player.x - e.x, player.y - e.y);
             if(dist < player.radius + e.radius && !(Date.now() < shieldUntil)) {
                 health -= e.type === 'boss' ? 3 : (e.type === 'elite' ? 2 : 1);
                 addExplosion(e.x, e.y, '#ff6666');
                 enemies.splice(i,1); i--;
-                if(health <= 0) { gameRunning = false; }
+                if(health <= 0) { 
+                    gameRunning = false; 
+                    if(spawnInterval) clearInterval(spawnInterval);
+                }
                 updateUI();
                 continue;
             }
+            
             // Bullet collision
             for(let j=0;j<bullets.length;j++) {
                 let b = bullets[j];
@@ -383,7 +408,16 @@
                     if(e.health <= 0) {
                         let points = (Date.now() < doubleScoreUntil) ? e.points * 2 : e.points;
                         score += points;
+                        enemiesKilled++;
                         addExplosion(e.x, e.y, e.color);
+                        
+                        // Wave progression based on kills
+                        if(enemiesKilled % 20 === 0) {
+                            wave++;
+                            updateUI();
+                        }
+                        
+                        // Power-up drop
                         if(Math.random() < 0.2) {
                             let types = ['rapid','shield','health','double','homingCharge'];
                             powerups.push(new PowerUp(e.x, e.y, types[Math.floor(Math.random()*types.length)]));
@@ -415,6 +449,7 @@
                     homingMissiles.splice(i,1); i--;
                     if(m.target.health <= 0) {
                         score += m.target.points;
+                        enemiesKilled++;
                         updateUI();
                         enemies = enemies.filter(e => e !== m.target);
                     }
@@ -446,13 +481,6 @@
             particles[i].y += particles[i].vy;
             particles[i].life--;
             if(particles[i].life <= 0) particles.splice(i,1);
-        }
-
-        // Wave progression
-        if(enemies.length === 0 && gameRunning && !bossActive) {
-            wave++;
-            updateUI();
-            startWave();
         }
 
         // Auto shooting
@@ -542,6 +570,11 @@
             ctx.font = "bold 12px monospace";
             ctx.fillText(`🎯 MISSILES: ${homingCharges}`, W-110, 35);
         }
+        
+        // Wave indicator
+        ctx.fillStyle = '#88aaff';
+        ctx.font = "bold 14px monospace";
+        ctx.fillText(`🌊 WAVE ${wave}`, W/2-40, 30);
     }
 
     function loop() {
@@ -550,13 +583,11 @@
         requestAnimationFrame(loop);
     }
 
-    // Mouse tracking - FIXED: cursor now follows properly
+    // Mouse tracking
     canvas.addEventListener('mousemove', (e) => {
         const rect = canvas.getBoundingClientRect();
         const scaleX = canvas.width / rect.width;
-        const scaleY = canvas.height / rect.height;
         let newX = (e.clientX - rect.left) * scaleX;
-        let newY = (e.clientY - rect.top) * scaleY;
         mouseX = Math.min(W - 15, Math.max(15, newX));
     });
 
@@ -604,6 +635,7 @@
         document.getElementById('guideModal').classList.remove('show');
     });
 
+    // Start the game
     resetGame();
     loop();
 </script>
